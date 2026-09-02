@@ -1,0 +1,9 @@
+transformers>=4.40
+torch>=2.0
+sentencepiece>=0.1.99
+shap>=0.44
+streamlit>=1.30
+langgraph>=0.1
+numpy
+wordfreq
+requests

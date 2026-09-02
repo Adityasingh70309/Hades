@@ -1,16 +1,4 @@
-"""
-explain.py
-SHAP-based explainability for the hate speech classifier.
-Highlights which words/tokens contributed most to a given prediction.
 
-Usage:
-    python src/explain.py
-    or import explain(text) into the dashboard / Explanation Agent.
-
-Note: SHAP on transformers does multiple forward passes per explanation,
-so this is meant to run on-demand (e.g. when a moderator clicks
-"why was this flagged?"), not on every single prediction in real time.
-"""
 
 import shap
 import numpy as np
@@ -18,14 +6,12 @@ import torch
 from inference import model, tokenizer, device, LABEL_NAMES, predict
 
 
-# ---- SHAP-compatible prediction function ----
-# shap.Explainer expects a function that takes a list of raw strings
-# and returns a numpy array of shape (num_texts, num_classes) with probabilities.
+
 def _predict_proba(texts: list[str]) -> np.ndarray:
     results = []
     for text in texts:
         inputs = tokenizer(
-            text, return_tensors="pt", truncation=True, padding=True, max_length=128
+            text, return_tensors="pt", truncation=True, padding=True, max_length=192
         ).to(device)
         with torch.no_grad():
             outputs = model(**inputs)
@@ -40,17 +26,7 @@ explainer = shap.Explainer(_predict_proba, masker, output_names=LABEL_NAMES)
 
 
 def explain(text: str, top_k: int = 5) -> dict:
-    """
-    Run SHAP explanation on a single piece of text.
-
-    Returns:
-        {
-            "text": str,
-            "predicted_label": str,
-            "confidence": float,
-            "top_contributing_words": [(word, shap_value), ...],  # sorted by |impact|, descending
-        }
-    """
+   
     pred = predict(text)
     predicted_label = pred["label"]
     label_idx = LABEL_NAMES.index(predicted_label)

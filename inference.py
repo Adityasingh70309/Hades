@@ -1,21 +1,12 @@
-"""
-inference.py
-Local inference for the fine-tuned hate speech classifier.
-Loads the model from Hugging Face Hub (no GPU required for inference).
-
-Usage:
-    python inference.py
-    or import predict() / predict_batch() into other modules (agents, dashboard, etc.)
-"""
 
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 import torch
 
 # ---- CONFIG ----
-MODEL_NAME = "Noveau/hate-speech-roberta-v1"  # <-- replace with your actual HF repo id
-LABEL_NAMES = ["hatespeech", "normal", "offensive"]   # must match training label order
+MODEL_NAME = "Noveau/hades-hatexplain-deberta-v3"  
+LABEL_NAMES = ["hatespeech", "normal", "offensive"]   
 
-# ---- LOAD MODEL (runs once when this module is imported) ----
+
 print(f"Loading model from {MODEL_NAME} ...")
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME)
@@ -27,23 +18,13 @@ print(f"Model loaded on {device}.")
 
 
 def predict(text: str) -> dict:
-    """
-    Run inference on a single piece of text.
-
-    Returns:
-        {
-            "text": str,
-            "label": str,            # predicted class name
-            "confidence": float,     # softmax probability of predicted class
-            "probabilities": dict,   # full probability distribution over all classes
-        }
-    """
+  
     inputs = tokenizer(
         text,
         return_tensors="pt",
         truncation=True,
         padding=True,
-        max_length=128,
+        max_length=192,
     ).to(device)
 
     with torch.no_grad():
@@ -71,11 +52,7 @@ def predict_batch(texts: list[str]) -> list[dict]:
 
 
 def predict_with_unsure_threshold(text: str, threshold: float = 0.6) -> dict:
-    """
-    Same as predict(), but overrides the label to 'unsure' if confidence
-    is below the given threshold. This feeds your Fusion & Decision layer's
-    'Unsure' bucket (routes low-confidence predictions to human review / slang lookup).
-    """
+   
     result = predict(text)
     if result["confidence"] < threshold:
         result["label"] = "unsure"
