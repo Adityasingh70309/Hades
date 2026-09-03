@@ -4,6 +4,7 @@ from langgraph.graph import StateGraph, START, END
 
 from text_pipeline import classify_text
 from slang_module import get_slang_context
+from offensive_lexicon import lexicon_boost, lexicon_hits
 
 
 class HADESState(TypedDict):
@@ -42,23 +43,34 @@ def fusion_agent(state: HADESState) -> HADESState:
     text_result = state["text_result"]
     slang_context = state.get("slang_context")
 
-    # straightforward -- only one signal so just use it directly
-    final_label = text_result["label"]
-    best_conf = text_result["confidence"]
+    probs = dict(text_result["probabilities"])
+    raw_label = text_result["label"]
+    raw_conf = text_result["confidence"]
 
-    probs = text_result["probabilities"]
+    # offensive-lexicon soft boost: only for borderline cases
+    hits = lexicon_hits(state["text"])
+    boosted = False
+    if hits and (raw_conf < 0.75 or probs.get("offensive", 0) > 0.25):
+        probs = lexicon_boost(probs, state["text"])
+        boosted = True
+
+    # re-derive label from (possibly boosted) probs
+    final_label = max(probs, key=probs.get)
+    best_conf = float(probs[final_label])
 
     slang_note = ""
     if slang_context and slang_context["oov_tokens"]:
         resolved = [t for t, d in slang_context["definitions"].items() if d]
         slang_note = f" slang detected: {slang_context['oov_tokens']} resolved: {resolved}."
 
+    lex_note = f" lexicon_hits: {hits} boost: {boosted}." if hits else ""
+    # keep raw for debugging
     reasoning = (
-        f"text={final_label}({best_conf:.2f}).{slang_note} "
-        f"probs: {probs}"
+        f"text={raw_label}({raw_conf:.2f})->fusion={final_label}({best_conf:.2f}).{slang_note}{lex_note} "
+        f"probs: {probs} raw: {text_result['probabilities']}"
     )
 
-    print(f"  Final label: {final_label} ({best_conf:.3f})")
+    print(f"  Final label: {final_label} ({best_conf:.3f}){' [lexicon boosted]' if boosted else ''}")
 
     return {
         **state,
